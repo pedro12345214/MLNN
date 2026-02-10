@@ -1,11 +1,3 @@
-"""
-Optuna hyperparameter optimization for your NN (Sigmoid + BCE).
-Keeps your ROOTDataset, BalancedLoss, EarlyStopping logic.
-
-Run:
-  python -u NN_optuna.py
-"""
-
 import os
 import json
 import numpy as np
@@ -19,9 +11,6 @@ from sklearn.model_selection import train_test_split
 
 import uproot
 
-# ----------------------------
-# Your dataset (same as yours)
-# ----------------------------
 class ROOTDataset(Dataset):
     def __init__(self, signal_file, background_file, variables, max_events=None):
         self.variables = variables
@@ -55,9 +44,7 @@ class ROOTDataset(Dataset):
         # labels as float32 for BCE
         return torch.from_numpy(self.X[idx]), torch.tensor(self.y[idx], dtype=torch.float32)
 
-# ----------------------------
-# Your loss (same as yours)
-# ----------------------------
+
 class BalancedLoss(nn.Module):
     def __init__(self, alpha=None):
         super().__init__()
@@ -71,7 +58,7 @@ class BalancedLoss(nn.Module):
         return torch.mean(ce)
 
 # ----------------------------
-# Early stopping (same as yours)
+# Early stopping 
 # ----------------------------
 class EarlyStopping:
     def __init__(self, patience, delta):
@@ -376,3 +363,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
