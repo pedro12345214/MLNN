@@ -119,6 +119,10 @@ I suggest you to submit job (with more cpu also) as it could take a long time de
 - Run with largest set again at this point.
 - The result is in the slurm output and also a png in the created directory.
 
+```bash
+python cumu_shap_groups.py
+```
+
 Training the NN with only the feautures responsible for model's 95% of predictions, should generally, increases the discrimination power of the NN model.
 
 ### 8. Optuna Hyperparameters Optimization. Run "OptunaNN.py"
@@ -128,6 +132,8 @@ Training the NN with only the feautures responsible for model's 95% of predictio
 - This will take a long time (from few hours to days and month) depending on your data size.
 - After this run NN.py again with the Optuna Optimized hyperparameters for Baseline and for SHAP one.
 - The result is in the slurm output.
+
+Submit job is necessary here.
 
 ### 9. Train Baseline (largest set) and SHAP Neural Network using Optuna Optimized hyperparameters.
 
@@ -139,6 +145,10 @@ Training the NN with only the feautures responsible for model's 95% of predictio
 - Make changes accordingly (like the naming of the output files, scaling factors). Don't forget about multiplying fb with the inverse of shrinking factor if you had used MLprep2.C to produce your sidebands root.
 - This produces 6 files: ROC+AUC with Baseline+SHAP posing together, Loss curves of the SHAP model, Probablity distribution/MLscore, FOM curve and its maximum point/threshold, Metrics of the model(F1 Score, Accuary, precision...), ROC+AUC of SHAP only.
 
+```bash
+python evaluation.py
+```
+
 ### 11. Produce the MC and Data root files with Tree naming of "Tdata" / make modfication of the code to make it use the orignal naming of the tree instead of this.
 
 - Here you should apply finiteCut and MCcut to data and MC signal using "MLprep.C".
@@ -148,6 +158,10 @@ Training the NN with only the feautures responsible for model's 95% of predictio
 - Make changes accordingly.
 - Input Data and MC signal root files.
 - Output Data and MC signal root files with MLscore in the "ROOT_files" directory.
+
+```bash
+python apply_model.py
+```
 
 ### 13. Run "MLprep.C" again to add the MLcut using the MLscore cut value.
 
