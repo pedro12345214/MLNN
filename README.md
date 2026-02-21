@@ -3,6 +3,8 @@
 First of all, thanks to Gabriela Sousa and Teresa Escária, for setting the base for Neural Network codes and workflow, also they wrote an excellent instruction as well.
 This work is to extend the codes/workflow and include the data standardization which was missing previously, also to with ability of incorporate analysis of more particules.
 
+This Neural Network uses Balanced Cross Entropy Loss Function + Sigmoid final output, and ReLU activation function, so to classify 0(background like) and 1(signal like).
+
 ---
 
 ## Instruction for first time setting up:
@@ -53,6 +55,7 @@ root -l mc_double_gaussian_fit.C
 
 - Make necessary change to "MLprep.C".
 - Insert your signal region value (upper and lower limits).
+- Here you should apply sbCut and MCcut to data sidebands and MC signal.
 - Please change the Input Tree as accordingly to your root files.
   
 Please change the Output Tree name as following:
@@ -95,6 +98,7 @@ python correlation_MLprep.py
 - Please change the MC signal and Data sidebands roots directories to the one you are analyzing.
 - Choose a name for the baseline moodel and later a name for Optuna optimized model.
 - Train with All the variables (Largest set) at this point.
+- The model will be stored as pth.
 
 For dataloader, this is a genrally good setup, but could increase the batch size for val_loader and test_loader, as large as RAM enables without crashing.
 Only change train_loader batch size with optuna optimized value.
@@ -107,15 +111,50 @@ test_loader  = DataLoader(test_ds,  batch_size=16384, shuffle=False, num_workers
 
 I suggest you to submit job (with more cpu also) as it could take a long time depending the size of root files.
 
-### 7. Run "cumu_shap_groups.py"
+### 7. Feature importance. Run "cumu_shap_groups.py" 
 
 - Based on results from correlation matrix, groups highly correlated variables (set at 80% correlation).
 - Performs cumulative SHAP analysis with representatives of each correlation group.
 - Selects set of feautures responsible for model's 95% of predictions.
 - Run with largest set again at this point.
+- The result is in the slurm output and also a png in the created directory.
 
-  
+Training the NN with only the feautures responsible for model's 95% of predictions, should generally, increases the discrimination power of the NN model.
 
+### 8. Optuna Hyperparameters Optimization. Run "OptunaNN.py"
 
+- Using the SHAP selected features to find the loweest loss value hyperparameters model.
+- You can change the hyperparameters range for optimization.
+- This will take a long time (from few hours to days and month) depending on your data size.
+- After this run NN.py again with the Optuna Optimized hyperparameters for Baseline and for SHAP one.
+- The result is in the slurm output.
 
+### 9. Train Baseline (largest set) and SHAP Neural Network using Optuna Optimized hyperparameters.
 
+- Add your Optuna Architecture to the "ClassificationModel", perhaps need to add also the forward function depending the number of hidden layers.
+- Train both Baseline and SHAP selected features models, for later evaluations. This Baseline is not the same as baseline without Optuna optimized hyperparameters.
+
+### 10. Evalutaion. Run "evaluation.py"
+
+- Make changes accordingly (like the naming of the output files, scaling factors). Don't forget about multiplying fb with the inverse of shrinking factor if you had used MLprep2.C to produce your sidebands root.
+- This produces 6 files: ROC+AUC with Baseline+SHAP posing together, Loss curves of the SHAP model, Probablity distribution/MLscore, FOM curve and its maximum point/threshold, Metrics of the model(F1 Score, Accuary, precision...), ROC+AUC of SHAP only.
+
+### 11. Produce the MC and Data root files with Tree naming of "Tdata" / make modfication of the code to make it use the orignal naming of the tree instead of this.
+
+- Here you should apply finiteCut and MCcut to data and MC signal using "MLprep.C".
+
+### 12. Run "apply_model.py"
+
+- Make changes accordingly.
+- Input Data and MC signal root files.
+- Output Data and MC signal root files with MLscore in the "ROOT_files" directory.
+
+### 13. Run "MLprep.C" again to add the MLcut using the MLscore cut value.
+
+- Make changes accordingly.
+- Don't forget finiteCut to get rid of NaN/Infinity data.
+- Get the data root with MLscore cut applied.
+
+### 14. Fit you data root with ML cut applied.
+
+- Again, you can use "data_fit_Bplus_erfc_ML.C" or "data_fit_Bs.C" (if it's B+ or Bs). For other particles, you need to write a fitting ROOTFIT script for them.
