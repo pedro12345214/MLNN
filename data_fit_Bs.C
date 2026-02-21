@@ -87,7 +87,7 @@ void total_data_fit_Bd() {
 
     
     // Load real data tree
-    TFile* file = TFile::Open("/lstore/cms/u25pedrochan/MLNN/ROOT_files/Data_pp_Bs_optuna_cut.root");
+    TFile* file = TFile::Open("/lstore/cms/u25pedrochan/MLNN/ROOT_files/Data_pp_Bu_MLcut_sd_opt_v1.root");
     if (!file || file->IsZombie()) {
         std::cerr << "Error: Could not open real data file." << std::endl;
         return;
@@ -407,7 +407,7 @@ void total_data_fit_Bd() {
     zeroLine->Draw("same");
 
 
-    TString name = "Bs_MLscore_Fit_alt4.pdf";
+    TString name = "Bs_MLscore_Fit_v2.pdf";
     c->SaveAs(name);
 
     std::cout << std::fixed << std::setprecision(2);

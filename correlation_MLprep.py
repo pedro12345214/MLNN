@@ -5,8 +5,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-mc_path = "ROOT_files/MC_pp_Bu_signal.root"
-data_path = "ROOT_files/Data_pp_Bu_sidebands.root"
+mc_path = "ROOT_files/MC_pp_Bs_signal.root"
+data_path = "ROOT_files/Data_pp_Bs_sidebands.root"
 
 out_dir = "Correlation_Matrices"
 os.makedirs(out_dir, exist_ok=True)
@@ -56,7 +56,7 @@ def save_correlation_artifacts(df, data_type):
     corr = df.corr(method='pearson')
 
     # Save CSV (this is what cumulative_shap_groups.py expects)
-    csv_path = os.path.join(out_dir, f"{data_type}_Bu_CorrelationMatrix.csv")
+    csv_path = os.path.join(out_dir, f"{data_type}_pp_Bs_CorrelationMatrix.csv")
     #csv_path = os.path.join(out_dir, f"{data_type}_CorrelationMatrix_final.csv")
     corr.to_csv(csv_path)
 
@@ -68,7 +68,7 @@ def save_correlation_artifacts(df, data_type):
     plt.xticks(rotation=45, ha="right")  # 45° inclined
     plt.title(f"{data_type} Bu Correlation Matrix")
     plt.tight_layout()
-    png_path = os.path.join(out_dir, f"{data_type}_Bu_CorrelationMatrix.png")
+    png_path = os.path.join(out_dir, f"{data_type}_pp_Bs_CorrelationMatrix.png")
     #png_path = os.path.join(out_dir, f"{data_type}_CorrelationMatrix_final.png")
     plt.savefig(png_path, dpi=150)
     plt.close()
@@ -82,7 +82,7 @@ print(f"Generating correlation matrices ...")
 # Load the variable list for this version
 variables = ["Bchi2cl", "Bcos_dtheta", "Bdtheta", "Bnorm_svpvDistance_2D", "Bnorm_trk1Dxy", "Bnorm_trk2Dxy",
         "Bpt", "Btktkpt", "Btrk1Pt", "Btrk2Pt", "Btrk1dR", "Btrk2dR",
-        "BtrkPtimb", "By", "nSelectedChargedTracks"]
+        "BtrkPtimb", "By", "nSelectedChargedTracks", "Btktkmass", "BtktkvProb", "BQvalue"]
 
 #variables = ['bLBSs', 'kstPt', 'IsoPtR_dr04_sum', 'kstTrkpDCABSs', 'kstTrkmDCABSs', 'bVtxCL', 'mumPt', 
 #        'muLeadingPt', 'bDCABSs', 'mupPt', 'mupIsoPtR_dr04', 'kstTrkpDCABS', 'mumuPtR']

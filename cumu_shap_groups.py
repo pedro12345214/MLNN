@@ -1,3 +1,4 @@
+
 """
 One-shot feature selection: SHAP importance combined with correlation-based clustering.
 - Correlation matrices (Signal/Background) are pre-computed and loaded from CSV.
@@ -37,8 +38,8 @@ n_explain = 750             # number of samples to explain
 nsamples_kernel = 2078       # approximation parameter for KernelExplainer
 
 # ------------- Load correlation matrices -------------
-sig_csv = "Correlation_Matrices/Signal_CorrelationMatrix.csv"
-bkg_csv = "Correlation_Matrices/Background_CorrelationMatrix.csv"
+sig_csv = "Correlation_Matrices/Signal_pp_Bs_CorrelationMatrix.csv"
+bkg_csv = "Correlation_Matrices/Background_pp_Bs_CorrelationMatrix.csv"
 
 if not (os.path.isfile(sig_csv) and os.path.isfile(bkg_csv)):
     raise FileNotFoundError(f"Correlation CSV files are missing. Please generate them with correlation_matrix.py.")
@@ -48,7 +49,12 @@ corr_bkg = pd.read_csv(bkg_csv, index_col=0)
 
 # ------------- Load variable list (consistent order) -------------
 variable_list = ["Bchi2cl", "Bcos_dtheta", "Bdtheta", "Bnorm_svpvDistance_2D",
-        "Bpt", "Btktkpt", "Btrk1Pt","Btrk2Pt", "Btrk1dR", "Btrk2dR", "BtrkPtimb"]
+        "Bpt", "Btktkpt", "Btrk1Pt","Btrk2Pt", "Btrk1dR", "Btrk2dR", "BtrkPtimb", "Btktkmass", "BQvalue"]
+
+
+#variable_list = ["Bchi2cl", "Bcos_dtheta", "Bdtheta", "Bnorm_svpvDistance_2D",
+#        "Bpt", "Btrk1Pt", "Btrk1dR"]
+
 
 # Reorder correlation matrices to match the official variable list
 corr_sig = corr_sig.reindex(index=variable_list, columns=variable_list)
@@ -84,13 +90,17 @@ for v in variable_list:
 
 # ------------- Load model and data (no retraining) -------------
 input_size = len(variable_list)
-ckpt_path = "checkpoints/baseline_pp_Bs_model_checkpoint2.pth"
+ckpt_path = "checkpoints/baseline_pp_Bs_model_checkpoint_expQ.pth"
 
 model = ClassificationModel(input_size=input_size).to(device)
 ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
 state = ckpt.get("model_state_dict", ckpt)
 model.load_state_dict(state)
 model.eval()
+
+mu = np.array(ckpt["scaler_mean"], dtype=np.float32)      # shape (n_features,)
+sigma = np.array(ckpt["scaler_std"], dtype=np.float32)    # shape (n_features,)
+sigma = np.where(sigma == 0, 1.0, sigma)                 # protect against zero std
 
 # Load ROOT data into tensors
 dir_path = "ROOT_files"
@@ -113,7 +123,9 @@ X_exp = X_all[: min(n_explain, X_all.shape[0])].detach().cpu().numpy()
 
 # Wrapper for the model (1D output)
 def model_fn(x):
-    x_tensor = torch.tensor(x, dtype=torch.float32).to(device)
+    x = np.asarray(x, dtype=np.float32)
+    x = (x - mu) / sigma   # <-- standardize like training
+    x_tensor = torch.from_numpy(x).to(device)
     with torch.no_grad():
         preds = model(x_tensor)
     preds = preds.squeeze(-1).detach().cpu().numpy()
@@ -157,9 +169,9 @@ os.makedirs(OUT_DIR, exist_ok=True)
 with open(os.path.join(OUT_DIR, "groups.json"), "w") as f:
     json.dump({"groups": groups, "representatives": selected_reps}, f, indent=2)
 
-rep_importance.to_csv(os.path.join(OUT_DIR, "pp_Bs_representatives_importance.csv"))
-fractions.to_csv(os.path.join(OUT_DIR, "pp_Bs_representatives_importance_fractions.csv"))
-cumulative.to_csv(os.path.join(OUT_DIR, "pp_Bs_representatives_cumulative.csv"))
+rep_importance.to_csv(os.path.join(OUT_DIR, "expQ_pp_Bs_representatives_importance.csv"))
+fractions.to_csv(os.path.join(OUT_DIR, "expQ_pp_Bs_representatives_importance_fractions.csv"))
+cumulative.to_csv(os.path.join(OUT_DIR, "expQ_pp_Bs_representatives_cumulative.csv"))
 
 # Plot cumulative importance (representatives only)
 plt.figure(figsize=(14, 6))
@@ -173,7 +185,7 @@ plt.ylabel("Cumulative SHAP importance (representatives)")
 plt.xlabel("Features (group representatives)")
 plt.legend()
 plt.tight_layout()
-plt.savefig(os.path.join(OUT_DIR, "pp_Bs_cumulative_representatives.png"), dpi=200)
+plt.savefig(os.path.join(OUT_DIR, "expQ_pp_Bs_cumulative_representatives.png"), dpi=200)
 plt.close()
 
 # Log final results

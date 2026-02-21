@@ -83,7 +83,6 @@ def prepdata(dir_path, root_mc, root_data, variables):
 
     return X.astype(np.float32), y.astype(np.float32)
 
-
 class ClassificationDataset(Dataset):
     """
     PyTorch dataset wrapping features and labels.
@@ -99,6 +98,20 @@ class ClassificationDataset(Dataset):
     def __getitem__(self, index):
         return self.X[index], self.y[index]
 
+class StandardizedSubset(Dataset):
+    def __init__(self, base_dataset, indices, mean, std):
+        self.base = base_dataset
+        self.indices = indices
+        self.mean = torch.tensor(mean, dtype=torch.float32)
+        self.std  = torch.tensor(std, dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, i):
+        x, y = self.base[self.indices[i]]        # raw x
+        x = (x - self.mean) / self.std           # standardized x
+        return x, y
 
 # === MODEL === #
 class ClassificationModel(nn.Module):
@@ -134,29 +147,76 @@ class ClassificationModel(nn.Module):
 
         # pp Bs Optuna Model 
         # 1st hidden layer
-        self.fc1 = nn.Linear(input_size, 248)
-        self.relu1 = nn.ReLU()
-        self.dropout1 = nn.Dropout(0.105)
+        #self.fc1 = nn.Linear(input_size, 248)
+        #self.relu1 = nn.ReLU()
+        #self.dropout1 = nn.Dropout(0.105)
         # 2nd hidden layer
-        self.fc2 = nn.Linear(248, 97)
-        self.relu2 = nn.ReLU()
-        self.dropout2 = nn.Dropout(0.105)
+        #self.fc2 = nn.Linear(248, 97)
+        #self.relu2 = nn.ReLU()
+        #self.dropout2 = nn.Dropout(0.105)
         # 3rd hidden layer
-        self.fc3 = nn.Linear(97, 21)
-        self.relu3 = nn.ReLU()
-        self.dropout3 = nn.Dropout(0.105)
+        #self.fc3 = nn.Linear(97, 21)
+        #self.relu3 = nn.ReLU()
+        #self.dropout3 = nn.Dropout(0.105)
         # Output layer
-        self.out = nn.Linear(21, 1)
+        #self.out = nn.Linear(21, 1)
+        #self.sigmoid = nn.Sigmoid()
+
+
+        # pp Bs Optuna Model Standardized Data Version
+        # 1st hidden layer
+        self.fc1 = nn.Linear(input_size, 184)
+        self.relu1 = nn.ReLU()
+        self.dropout1 = nn.Dropout(0.15)
+        # 2nd hidden layer
+        self.fc2 = nn.Linear(184, 90)
+        self.relu2 = nn.ReLU()
+        self.dropout2 = nn.Dropout(0.15)
+        # Output layer
+        self.out = nn.Linear(90, 1)
         self.sigmoid = nn.Sigmoid()
 
+        # pp Bs Optuna Model Standardized Data Version v2
+        # 1st hidden layer
+        #self.fc1 = nn.Linear(input_size, 213)
+        #self.relu1 = nn.ReLU()
+        #self.dropout1 = nn.Dropout(0.29)
+        # 2nd hidden layer
+        #self.fc2 = nn.Linear(213, 22)
+        #self.relu2 = nn.ReLU()
+        #self.dropout2 = nn.Dropout(0.29)
+        # Output layer
+        #self.out = nn.Linear(22, 1)
+        #self.sigmoid = nn.Sigmoid()
 
 
+        # pp Bu Optuna Model (using 2% of data sidebands)
+        # 1st hidden layer
+        #self.fc1 = nn.Linear(input_size, 254)
+        #self.relu1 = nn.ReLU()
+        #self.dropout1 = nn.Dropout(0.17)
+        # 2nd hidden layer
+        #self.fc2 = nn.Linear(254, 121)
+        #self.relu2 = nn.ReLU()
+        #self.dropout2 = nn.Dropout(0.17)
+        # Output layer
+        #self.out = nn.Linear(121, 1)
+        #self.sigmoid = nn.Sigmoid()
+
+    #3 Hidden layer
+    #def forward(self, x):
+    #    x = self.dropout1(self.relu1(self.fc1(x)))
+    #    x = self.dropout2(self.relu2(self.fc2(x)))
+    #    x = self.dropout3(self.relu3(self.fc3(x)))
+    #    x = self.sigmoid(self.out(x))
+    #    return x
+    #2 Hidden layer
     def forward(self, x):
         x = self.dropout1(self.relu1(self.fc1(x)))
         x = self.dropout2(self.relu2(self.fc2(x)))
-        x = self.dropout3(self.relu3(self.fc3(x)))
         x = self.sigmoid(self.out(x))
         return x
+
 
 
 # === LOSS FUNCTION === #
@@ -339,16 +399,20 @@ def main():
     try:
         #largest set 
         #variables = ["Bchi2cl", "Bcos_dtheta", "Bdtheta", "Bnorm_svpvDistance_2D",
-        #"Bpt", "Btktkpt", "Btrk1Pt","Btrk2Pt", "Btrk1dR", "Btrk2dR", "BtrkPtimb"] #Two Tracks Particles
-        #variables = [] # B+ Single track
+        #"Bpt", "Btktkpt", "Btrk1Pt","Btrk2Pt", "Btrk1dR", "Btrk2dR", "BtrkPtimb", "Btktkmass", "BQvalue"] #Two Tracks Particles
+        #variables = ['Bchi2cl','Bnorm_svpvDistance_2D', 'Bpt', 'Bcos_dtheta','Bdtheta', 'Btrk1dR', 'Btrk1Pt'] # B+ Single track
+
+        #Exp BQvalue
+        variables = ['BQvalue', 'Btktkpt', 'Bdtheta', 'Bnorm_svpvDistance_2D', 'Btktkmass']
 
         #shap chosen set
-        #variables =['Bdtheta', 'Bnorm_svpvDistance_2D', 'Btrk2dR', 'Bpt', 'Btktkpt', 'Bchi2cl'] #pp Bs
-        variables =['Bnorm_svpvDistance_2D', 'Bpt', 'Bdtheta', 'Btrk1dR', 'Btrk1Pt'] #pp Bu 
+        #variables =['Bdtheta', 'Bnorm_svpvDistance_2D', 'Btrk1dR', 'Btktkmass', 'Bpt', 'Btrk2Pt', 'Bchi2cl'] #pp Bs
+        #variables =['Bnorm_svpvDistance_2D', 'Bnorm_trk1Dxy', 'Bdtheta', 'Btktkmass', 'Bpt', 'Btktkpt', 'Btrk2dR', 'Bchi2cl'] #pp Bs  
+        #variables =['Bnorm_svpvDistance_2D', 'Bpt', 'Bdtheta', 'Btrk1dR', 'Btrk1Pt'] #pp Bu 
         
 
-        dataset = ROOTDataset("ROOT_files/MC_pp_Bu_signal.root",
-                            "ROOT_files/Data_pp_Bu_sidebands.root",
+        dataset = ROOTDataset("ROOT_files/MC_pp_Bs_signal.root",
+                            "ROOT_files/Data_pp_Bs_sidebands.root",
                             variables,
                             max_events=None)   
 
@@ -363,10 +427,20 @@ def main():
         val_indices   = val_set.indices
         test_indices  = test_set.indices
 
+        # ---- Standardization (fit on TRAIN only) ----
+        X_train = dataset.X[train_indices]
+        mean = X_train.mean(axis=0)
+        std  = X_train.std(axis=0)
+        std[std < 1e-8] = 1.0  # avoid division by zero
+
+        train_ds = StandardizedSubset(dataset, train_indices, mean, std)
+        val_ds   = StandardizedSubset(dataset, val_indices, mean, std)
+        test_ds  = StandardizedSubset(dataset, test_indices, mean, std)
+
         # DataLoaders
-        train_loader = DataLoader(train_set, batch_size=16384, shuffle=True,  num_workers=4)
-        val_loader   = DataLoader(val_set,   batch_size=16384, shuffle=False, num_workers=4)
-        test_loader  = DataLoader(test_set,  batch_size=16384, shuffle=False, num_workers=4)
+        train_loader = DataLoader(train_ds, batch_size=128, shuffle=True,  num_workers=0)
+        val_loader   = DataLoader(val_ds,   batch_size=16384, shuffle=False, num_workers=0)
+        test_loader  = DataLoader(test_ds,  batch_size=16384, shuffle=False, num_workers=0)
 
         input_size = len(variables)
 
@@ -386,10 +460,18 @@ def main():
 
         # Define loss function and optimizer
         B_criterion = BalancedLoss(alpha=class_weights)
-        B_optimizer = optim.Adam(B_model.parameters(), lr=0.0017672687518874427, weight_decay=1.8265594494791445e-06)
+        #pp Bs
+        #B_optimizer = optim.Adam(B_model.parameters(), lr=0.0017672687518874427, weight_decay=1.8265594494791445e-06)
+        #pp Bs Standardized Version
+        B_optimizer = optim.Adam(B_model.parameters(), lr=0.0008134345165156819, weight_decay=1.0758532772001081e-05)
+        #pp Bs Standardized Version 2
+        #B_optimizer = optim.Adam(B_model.parameters(), lr=0.0034758374296484287, weight_decay=4.657660787575388e-06)       
+       
+        #pp B+
+        #B_optimizer = optim.Adam(B_model.parameters(), lr=0.0003193887582325283, weight_decay=1.0689254189563287e-06)
 
         # Early stopping
-        B_early_stopping = EarlyStopping(patience=85, delta=1e-6)
+        B_early_stopping = EarlyStopping(patience=65, delta=1e-6)
 
         # Train model
         print("\nTraining model with Balanced Loss...")
@@ -404,14 +486,16 @@ def main():
             "val_loss_curve": vl_vector,
             "best_epoch": best_epoch,
             "variables": variables,
-            "signal_file": "ROOT_files/MC_pp_Bu_signal.root",
-            "background_file": "ROOT_files/Data_pp_Bu_sidebands.root",
+            "signal_file": "ROOT_files/MC_pp_Bs_signal.root",
+            "background_file": "ROOT_files/Data_pp_Bs_sidebands.root",
             "split_sizes": [train_size, val_size, test_size],
             "split_indices": {
                 "train": train_indices,
                 "val": val_indices,
-                "test": test_indices}
-            }, os.path.join(checkpoint_dir, "optuna_pp_Bu_model_checkpoint_alt.pth"))
+                "test": test_indices},
+            "scaler_mean": mean,
+            "scaler_std": std
+            }, os.path.join(checkpoint_dir, "shap_pp_Bs_model_checkpoint_expQ.pth"))
 
     except Exception as e:
         print(f"An error occurred: {e}")

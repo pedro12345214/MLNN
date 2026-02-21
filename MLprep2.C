@@ -5,31 +5,36 @@
 #include <iostream>
 #include <TMath.h>
 #include <vector>
+#include <TRandom3.h>
 
-void MLprep() {
-    //const char* infile       = "/lstore/cms/u25pedrochan/MLNN/ROOT_files/Data_pp_Bu_selected_ml_output_sd_new_v2.root";
-    //const char* mcfile     = "/lstore/cms/u25pedrochan/MLNN/ROOT_files/MC_pp_Bu_dup_ml_output_sd_new_v2.root";
+void MLprep2() {
 
-    const char* infile       = "/lstore/cms/u25pedrochan/MLNN/ROOT_files/Data_pp_Bs_selected_ml_output_expQ.root";
-    const char* mcfile     = "/lstore/cms/u25pedrochan/MLNN/ROOT_files/MC_pp_Bs_selected_ml_output_expQ.root";
+    //const char* infile       = "/lstore/cms/u25pedrochan/MLNN/ROOT_files/Data_pp_Bs_selected_ml_output2.root";
+    //const char* mcfile     = "/lstore/cms/u25pedrochan/MLNN/ROOT_files/MC_pp_Bs_selected_ml_output2.root";
 
-    //const char* infile       = "/lstore/cms/hlegoinha/DATA_Sharing/Bmesons/Data_Bs.root";
-    //const char* mcfile     = "/lstore/cms/hlegoinha/DATA_Sharing/Bmesons/MC_Bs.root";
-    const char* intree_name   = "Tdata";
-    const char* outpath       = "/lstore/cms/u25pedrochan/MLNN/ROOT_files/Data_pp_Bs_MLcut_expQ.root";
-    const char* mcoutpath       = "/lstore/cms/u25pedrochan/MLNN/ROOT_files/MC_pp_Bs_MLcut_expQ.root";
-    const char* outtree_name  = "Tdata";   // if empty, keep same as input Tback->data sideband background Tsignal->MC signal
-    const char* mcoutree_name = "Tdata";
+    const char* infile       = "/lstore/cms/hlegoinha/DATA_Sharing/Bmesons/Data_Bu.root";
+    const char* mcfile     = "/lstore/cms/hlegoinha/DATA_Sharing/Bmesons/MC_Bu.root";
+    const char* intree_name   = "ntKp";
+    const char* outpath       = "/lstore/cms/u25pedrochan/MLNN/ROOT_files/Data_pp_Bu_sidebands_rng.root";
+    const char* mcoutpath       = "/lstore/cms/u25pedrochan/MLNN/ROOT_files/MC_pp_Bu_signal_rng.root";
+    const char* outtree_name  = "Tback";   // if empty, keep same as input Tback->data sideband background Tsignal->MC signal
+    const char* mcoutree_name = "Tsignal";
     
     // ---- Sideband definition (edit as needed) ----
 
     //MC Bs  
-    double left_lo  = 5.00,        left_hi  = 5.297591014;
-    double right_lo = 5.437168986, right_hi = 6.00;
+    //double left_lo  = 5.00,        left_hi  = 5.297591014;
+    //double right_lo = 5.437168986, right_hi = 6.00;
 
     //MC Bu
-    //double left_lo  = 5.00,        left_hi  = 5.178948768;
-    //double right_lo = 5.380091232, right_hi = 6.00;
+    double left_lo  = 5.00,        left_hi  = 5.178948768;
+    double right_lo = 5.380091232, right_hi = 6.00;
+
+    //fraction of data sidebands to be used for background training
+    double frac = 0.0222389;
+    // reproducible RNG seed (change if you want different random subset)
+    UInt_t seed = 12345;
+
 
     // ---- Define cut string ----
     TString sbCut;
@@ -43,7 +48,7 @@ void MLprep() {
     std::vector<TString> Vars = {
        "Bmass", "BQvalue", "Bchi2cl", "Bcos_dtheta", "Bdtheta", "Bnorm_svpvDistance_2D", "Bnorm_trk1Dxy", "Bnorm_trk2Dxy",
         "Bpt", "Btktkmass", "Btktkpt", "Btrk1Pt", "Btrk2Pt", "Btrk1dR", "Btrk2dR",
-        "BtrkPtimb","Bujmass", "By", "nSelectedChargedTracks", "BtktkvProb", "BQvalue", "MLscore"
+        "BtrkPtimb", "Bujmass", "By", "nSelectedChargedTracks" //, "MLscore"
     };
 
 
@@ -56,19 +61,7 @@ void MLprep() {
     // ---- Final cut ----
     TString cut = "(" + sbCut + ") && (" + finiteCut + ")";
     TString precut = "(Bnorm_svpvDistance_2D>5.404) && (" + finiteCut + ")";
-    TString precutBu = "(Bnorm_svpvDistance_2D>6.997) && (" + finiteCut + ")";
-    //TString MLcut = "MLscore>0.9259 &&  (" + finiteCut + ")";  //Bs cut 
-    //TString MLcut = "MLscore>0.9158 &&  (" + finiteCut + ")";  //Bs cut sd old optuna hyper
-    //TString MLcut = "MLscore>0.9359 &&  (" + finiteCut + ")";  //Bs cut sd new optuna hyper
-    //TString MLcut = "MLscore>0.9559 &&  (" + finiteCut + ")";
-    //TString MLcut = "MLscore>0.9439 &&  (" + finiteCut + ")";
-    TString MLcut = "MLscore>0.9820 && (" + finiteCut + ")";
-
-    //TString MLcut = "MLscore>0.9820 &&  (" + finiteCut + ")";  //Bu cut
-    //TString MLcut = "MLscore>0.9780 &&  (" + finiteCut + ")";  //Bu cut
-    //TString MLcut = "MLscore>0.9579 && (" + finiteCut + ")"; //Bu MLcut standardization + optuna v1
-    //TString MLcut = "MLscore>0.9679  &&  (" + finiteCut + ")"; Bu Best current cut    
-
+    TString MLcut = "MLscore>0.9259 &&  (" + finiteCut + ")";  //Bs cut  
     TString MCcut = "Bchi2cl>0.005 && Bpt>1 && (" + finiteCut + ")";
     TString Kstar_cut;
     TString Phi_cut;
@@ -137,13 +130,42 @@ void MLprep() {
         fin->Close();
         return;
     }
-    TTree *tout = tin->CopyTree(MLcut);
-    if (!tout) {
+    TTree *tout_full = tin->CopyTree(sbCut);
+    if (!tout_full) {
         std::cerr << "ERROR: CopyTree failed (cut may select 0 events)\n";
         fout->Close();
         fin->Close();
         return;
     }
+     
+    // If frac >= 1, keep everything
+    TTree *tout = nullptr;
+    if (frac >= 1.0) {
+        tout = tout_full;
+    } else {
+        TRandom3 rng(seed);
+
+        // Make empty clone with same branches
+        TTree *tsel = tout_full->CloneTree(0);
+
+        Long64_t n = tout_full->GetEntries();
+        Long64_t kept = 0;
+        for (Long64_t i = 0; i < n; ++i) {
+            tout_full->GetEntry(i);
+            if (rng.Rndm() <= frac) {
+                tsel->Fill();
+                ++kept;
+            }
+        }
+
+        std::cout << "DATA entries after cut (before frac): " << n << "\n";
+        std::cout << "DATA entries kept after frac        : " << kept << "\n";
+
+        // We will write tsel, and can delete tout_full later if you want.
+        tout = tsel;
+    }
+
+
     TFile *fout_mc = TFile::Open(mcoutpath, "RECREATE");
     if (!fout_mc || fout_mc->IsZombie()) {
         std::cerr << "ERROR: cannot create output file: " << mcoutpath << std::endl;
@@ -151,13 +173,14 @@ void MLprep() {
         return;
     }
 
-    TTree *tout_mc = tin_mc->CopyTree(MLcut);
+    TTree *tout_mc = tin_mc->CopyTree(MCcut);
     if (!tout_mc) {
         std::cerr << "ERROR: CopyTree failed (cut may select 0 events)\n";
         fout_mc->Close();
         fin_mc->Close();
         return;
     }
+
 
 
     // Optionally rename output tree

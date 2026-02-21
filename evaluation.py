@@ -18,7 +18,8 @@ from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, r
 
 sns.set_style("darkgrid")
 
-from NN import ROOTDataset, ClassificationModel
+from NN import ROOTDataset, StandardizedSubset
+from NN import ClassificationModel
 
 #def load_model_save_params(checkpoint_path):
 #
@@ -83,9 +84,18 @@ def load_model(checkpoint_path):
 
     # Split using the saved sizes
     split_indices = checkpoint["split_indices"]
-    test_set = Subset(dataset, split_indices["test"])
-    test_loader = DataLoader(test_set, batch_size=4096, shuffle=False)
+    test_idx = split_indices["test"]
     
+    # ---- load scaler from checkpoint ----
+    if "scaler_mean" not in checkpoint or "scaler_std" not in checkpoint:
+        raise KeyError("Checkpoint missing scaler_mean/scaler_std. Re-save your model with these included.")
+
+    mean = checkpoint["scaler_mean"]
+    std  = checkpoint["scaler_std"]
+
+    test_set = StandardizedSubset(dataset, test_idx, mean, std)
+    test_loader = DataLoader(test_set, batch_size=16384, shuffle=False)
+
     # Load model
     input_size = len(variables)
     model = ClassificationModel(input_size)
@@ -124,7 +134,7 @@ def plot_histogram(targets, probabilities, out_dir=".", best_thr=0.5):
     plt.ylabel("Normalized Density (log)", fontsize=14, labelpad=15) 
     plt.yscale("log") 
     plt.legend()
-    save_path = os.path.join(out_dir, "pp_Bs_prob_distribution.pdf")
+    save_path = os.path.join(out_dir, "expQ_pp_Bs_prob_distribution.pdf")
     plt.savefig(save_path)  # Save the plot as a PDF file
     plt.close()
 
@@ -142,7 +152,7 @@ def plot_roc_curve(targets, probabilities, out_dir=".", best_point=None):
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.legend(loc="lower right")
-    save_path = os.path.join(out_dir, "pp_Bs_roc_curve.pdf")
+    save_path = os.path.join(out_dir, "expQ_pp_Bs_roc_curve.pdf")
     plt.savefig(save_path)
     plt.close()
     print(f"ROC curve saved to {save_path}")
@@ -164,7 +174,7 @@ def save_metrics_pdf(targets, probabilities, out_dir=".", best_thr=0.5):
     conf_matrix = confusion_matrix(targets, pred_labels)
 
     # PDF output
-    pdf_filename = os.path.join(out_dir, f"pp_Bs_Metrics.pdf")
+    pdf_filename = os.path.join(out_dir, f"expQ_pp_Bs_Metrics.pdf")
     c = canvas.Canvas(pdf_filename, pagesize=letter)
     width, height = letter
 
@@ -222,7 +232,7 @@ def plot_loss_curve(checkpoint_path, out_dir="."):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()
-    plt.savefig(os.path.join(out_dir, f"pp_Bu_loss_curve.pdf"))
+    plt.savefig(os.path.join(out_dir, f"expQ_pp_Bs_loss_curve.pdf"))
     plt.close()
 
 
@@ -312,7 +322,7 @@ def calculate_fom(targets, probabilities, s_scale, b_scale, output_dir="."):
     plt.xlabel("Threshold")
     plt.ylabel("FoM values")
     plt.legend()
-    save_path = os.path.join(output_dir, "pp_Bs_FoM_vs_Thresholds.pdf")
+    save_path = os.path.join(output_dir, "expQ_pp_Bs_FoM_vs_Thresholds.pdf")
     plt.savefig(save_path)
     plt.close()
 
@@ -323,7 +333,7 @@ def calculate_fom(targets, probabilities, s_scale, b_scale, output_dir="."):
 def plot_combined_roc(targets, probabilities, output_dir="."):
 
     # Model with complete set of variables
-    large_checkpoint = "checkpoints/Baseline_pp_Bs_model_checkpoint2.pth"
+    large_checkpoint = "checkpoints/baseline_pp_Bs_model_checkpoint_expQ.pth"
     large_model, large_test_loader = load_model(large_checkpoint)
     large_targets, large_probs = get_targets_probabilities(large_model, large_test_loader)
 
@@ -344,7 +354,7 @@ def plot_combined_roc(targets, probabilities, output_dir="."):
     plt.legend(loc="lower right")
     plt.xlim(0, 0.2)
     plt.ylim(0.7, 1)
-    save_path = os.path.join(output_dir, "baseline_pp_Bs_combined_roc_curve.pdf")
+    save_path = os.path.join(output_dir, "expQ_pp_Bs_combined_roc_curve.pdf")
     plt.savefig(save_path)
     plt.close()
     print(f"ROC curve saved to {save_path}")
@@ -353,7 +363,7 @@ def plot_combined_roc(targets, probabilities, output_dir="."):
 
 if __name__ == "__main__":
    
-    checkpoint_path = f"checkpoints/optuna_pp_Bs_model_checkpoint2.pth"
+    checkpoint_path = f"checkpoints/shap_pp_Bs_model_checkpoint_expQ.pth"
     output_dir = f"EvaluationStats"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -366,6 +376,7 @@ if __name__ == "__main__":
 
     # Get signal and background scalings
     s_scale, b_scale = 0.552, 0.182
+    #s_scale, b_scale = 10.242, 0.245*44.9662528
 
     #s_scale, b_scale = save_scalings("scalings/fit_params_data_RTWT.json", "scalings/fit_params_mc_RTWT.json")
 

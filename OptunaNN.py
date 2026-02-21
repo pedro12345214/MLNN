@@ -1,3 +1,11 @@
+"""
+Optuna hyperparameter optimization for your NN (Sigmoid + BCE).
+Keeps your ROOTDataset, BalancedLoss, EarlyStopping logic.
+
+Run:
+  python -u NN_optuna.py
+"""
+
 import os
 import json
 import numpy as np
@@ -8,9 +16,12 @@ import optuna
 
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import train_test_split
-
+from NN import StandardizedSubset
 import uproot
 
+# ----------------------------
+# Your dataset (same as yours)
+# ----------------------------
 class ROOTDataset(Dataset):
     def __init__(self, signal_file, background_file, variables, max_events=None):
         self.variables = variables
@@ -44,7 +55,9 @@ class ROOTDataset(Dataset):
         # labels as float32 for BCE
         return torch.from_numpy(self.X[idx]), torch.tensor(self.y[idx], dtype=torch.float32)
 
-
+# ----------------------------
+# Your loss (same as yours)
+# ----------------------------
 class BalancedLoss(nn.Module):
     def __init__(self, alpha=None):
         super().__init__()
@@ -58,7 +71,7 @@ class BalancedLoss(nn.Module):
         return torch.mean(ce)
 
 # ----------------------------
-# Early stopping 
+# Early stopping (same as yours)
 # ----------------------------
 class EarlyStopping:
     def __init__(self, patience, delta):
@@ -155,10 +168,12 @@ def run_training_trial(
     input_size,
     class_weights,
     device,
+    mean,
+    std,
     max_epochs=200
 ):
     # ---- Suggest hyperparameters ----
-    n_layers = trial.suggest_int("n_layers", 1, 4)
+    n_layers = trial.suggest_int("n_layers", 2, 3)
     hidden_sizes = [
         trial.suggest_int(f"neurons_l{i}", 16, 256, log=True)
         for i in range(n_layers)
@@ -166,7 +181,7 @@ def run_training_trial(
     dropout = trial.suggest_float("dropout", 0.0, 0.5, step=0.005)
     lr = trial.suggest_float("lr", 1e-4, 5e-2, log=True)
     weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True)
-    batch_size = trial.suggest_categorical("batch_size", [512, 1024, 2048, 4096, 8192, 16384, 32768])
+    batch_size = trial.suggest_categorical("batch_size", [ 64,128, 256, 512])
 
     patience = trial.suggest_int("patience", 10, 100, step=5)
     delta = 1e-6
@@ -175,19 +190,22 @@ def run_training_trial(
     pin = torch.cuda.is_available()
     num_workers = 0  # safe default on shared FS
 
+    train_ds = StandardizedSubset(dataset, train_idx, mean.to(device="cpu"), std.to(device="cpu"))
+    val_ds   = StandardizedSubset(dataset, val_idx,   mean.to(device="cpu"), std.to(device="cpu"))
+
     train_loader = DataLoader(
-        Subset(dataset, train_idx),
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=pin
+      train_ds,
+      batch_size=batch_size,
+      shuffle=True,
+      num_workers=num_workers,
+      pin_memory=pin
     )
     val_loader = DataLoader(
-        Subset(dataset, val_idx),
-        batch_size=max(1024, batch_size),
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=pin
+      val_ds,
+      batch_size=max(16384, batch_size),
+      shuffle=False,
+      num_workers=num_workers,
+      pin_memory=pin
     )
 
     # ---- Model/loss/opt ----
@@ -230,13 +248,11 @@ def run_training_trial(
 # ----------------------------
 def main():
     # ---- Files/vars (edit if needed) ----
-    variables = [
-        "Bdtheta", "Bnorm_svpvDistance_2D",
-        "Bpt", "Btrk1Pt", "Btrk1dR"
-    ]
-
-    signal_file = "ROOT_files/MC_pp_Bu_signal.root"
-    background_file = "ROOT_files/Data_pp_Bu_sidebands.root"
+    #variables = ['Bdtheta', 'Bnorm_svpvDistance_2D', 'Btrk1dR', 'Btktkmass', 'Bpt', 'Btrk2Pt', 'Bchi2cl'] #pp Bs after standardization
+    variables = ['Bnorm_svpvDistance_2D', 'Bnorm_trk1Dxy', 'Bdtheta', 'Btktkmass', 'Bpt', 'Btktkpt', 'Btrk2dR', 'Bchi2cl'] #pp Bs after standardization NEW 
+    #variables = ['Bpt', 'Btrk1dR', 'Bnorm_svpvDistance_2D', 'Bchi2cl', 'Btrk1Pt', 'Bcos_dtheta'] #pp B+ after standardization
+    signal_file = "ROOT_files/MC_pp_Bs_signal.root"
+    background_file = "ROOT_files/Data_pp_Bs_sidebands.root"
 
     dataset = ROOTDataset(signal_file, background_file, variables, max_events=None)
     input_size = len(variables)
@@ -257,6 +273,16 @@ def main():
     val_idx, test_idx = train_test_split(
         temp_idx, test_size=0.50, random_state=42, stratify=y_all[temp_idx]
     )
+
+    # ---- Compute scaler on TRAIN split only ----
+    X_train = dataset.X[train_idx]  # numpy [Ntrain, n_features]
+    mean = torch.tensor(X_train.mean(axis=0), dtype=torch.float32)
+    std  = torch.tensor(X_train.std(axis=0), dtype=torch.float32)
+
+    # Protect against zero variance features
+    std[std == 0] = 1.0
+
+
     # train=50%, val=25%, test=25%
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -264,7 +290,7 @@ def main():
     # ---- Where to save best model ----
     checkpoint_dir = "checkpoints_optuna"
     os.makedirs(checkpoint_dir, exist_ok=True)
-    best_ckpt_path = os.path.join(checkpoint_dir, "optuna_pp_Bs_model_checkpoint.pth")
+    best_ckpt_path = os.path.join(checkpoint_dir, "sd_new_pp_Bs_model_checkpoint.pth")
 
     # ---- Objective wrapper ----
     def objective(trial):
@@ -276,6 +302,8 @@ def main():
             input_size=input_size,
             class_weights=class_weights,
             device=device,
+            mean=mean,
+            std=std,
             max_epochs=200
         )
 
@@ -312,12 +340,15 @@ def main():
     patience = best_params["patience"]
 
     pin = torch.cuda.is_available()
-    train_loader = DataLoader(Subset(dataset, train_idx), batch_size=batch_size, shuffle=True,
-                              num_workers=4, pin_memory=pin)
-    val_loader = DataLoader(Subset(dataset, val_idx), batch_size=max(16384, batch_size), shuffle=False,
-                            num_workers=4, pin_memory=pin)
-    test_loader = DataLoader(Subset(dataset, test_idx), batch_size=max(16384, batch_size), shuffle=False,
-                             num_workers=4, pin_memory=pin)
+
+    train_ds = StandardizedSubset(dataset, train_idx, mean, std)
+    val_ds   = StandardizedSubset(dataset, val_idx,   mean, std)
+    test_ds  = StandardizedSubset(dataset, test_idx,  mean, std)
+
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin)
+    val_loader   = DataLoader(val_ds,   batch_size=max(16384, batch_size), shuffle=False, num_workers=0, pin_memory=pin)
+    test_loader  = DataLoader(test_ds,  batch_size=max(16384, batch_size), shuffle=False, num_workers=0, pin_memory=pin)
+
     model = DynamicClassificationModel(input_size, hidden_sizes, dropout).to(device)
     criterion = BalancedLoss(alpha=class_weights.to(device))
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -352,7 +383,7 @@ def main():
     }, best_ckpt_path)
 
     # Save Optuna summary
-    with open(os.path.join(checkpoint_dir, "optuna_study_best.json"), "w") as f:
+    with open(os.path.join(checkpoint_dir, "optuna_study_best_sd_new.json"), "w") as f:
         json.dump({
             "best_value": best.value,
             "best_params": best.params,
@@ -363,4 +394,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

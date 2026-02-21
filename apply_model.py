@@ -12,6 +12,12 @@ from torch.utils.data import Dataset
 
 from NN import ClassificationModel
 
+def standardize_X(X, mean, std):
+    mean = torch.tensor(mean, dtype=torch.float32)
+    std  = torch.tensor(std,  dtype=torch.float32)
+    return (X - mean) / std
+
+
 def prepdata_for_application(file_path, variables, tree_name="Tdata"):
     """
     Load features from a ROOT tree for applying trained model.
@@ -58,7 +64,15 @@ def model_application(file_path, checkpoint_path, variables):
     checkpoint = torch.load(checkpoint_path, weights_only=False)
 
     X = prepdata_for_application(file_path, variables)
-    input_size = len(X[0])
+
+    # ---- standardize if scaler exists in checkpoint ----
+    if "scaler_mean" in checkpoint and "scaler_std" in checkpoint:
+        X = standardize_X(X, checkpoint["scaler_mean"], checkpoint["scaler_std"])
+    else:
+        print("[WARN] No scaler_mean/scaler_std found in checkpoint. "
+              "Assuming model was trained on raw (non-standardized) variables.")
+
+    input_size = X.shape[1]
     model = ClassificationModel(input_size)
     model.load_state_dict(checkpoint["model_state_dict"])
 
@@ -99,7 +113,7 @@ def save_outputs(input_file, checkpoint_path, variables, tree_name='Tdata'):
     arrays["MLscore"] = probabilities.astype(np.float32)
 
     # Create new file
-    output_file = input_file.replace(".root", f"_ml_output2.root")
+    output_file = input_file.replace(".root", f"_ml_output_expQ.root")
     with uproot.recreate(output_file) as new_file:
         # Write tree with all original dtypes preserved
         branch_types = {key: val.dtype for key, val in arrays.items()}
@@ -109,12 +123,18 @@ def save_outputs(input_file, checkpoint_path, variables, tree_name='Tdata'):
 
 def main():
  
-    checkpoint_path = f"checkpoints/optuna_pp_Bs_model_checkpoint2.pth"
+    checkpoint_path = f"checkpoints/shap_pp_Bs_model_checkpoint_expQ.pth"
     input_data = f"ROOT_files/Data_pp_Bs_selected.root"
     input_mc = f"ROOT_files/MC_pp_Bs_selected.root"
-    
-    variables = ['Bdtheta', 'Bnorm_svpvDistance_2D', 'Btrk2dR', 'Bpt', 'Btktkpt', 'Bchi2cl']
-    
+
+    variables = ['BQvalue', 'Btktkpt', 'Bdtheta', 'Bnorm_svpvDistance_2D', 'Btktkmass'] #B0s expQ
+    #variables = ['Bnorm_svpvDistance_2D', 'Bnorm_trk1Dxy', 'Bdtheta', 'Btktkmass', 'Bpt', 'Btktkpt', 'Btrk2dR', 'Bchi2cl'] #B0s sd v2   
+    #variables = ['Bnorm_svpvDistance_2D', 'Bpt', 'Bdtheta', 'Btrk1dR', 'Btrk1Pt'] #pp B+
+    #variables = ['Bchi2cl','Bnorm_svpvDistance_2D', 'Bpt', 'Bcos_dtheta', 'Btrk1dR', 'Btrk1Pt'] #pp B+ 
+    #variables = ['Bdtheta', 'Bnorm_svpvDistance_2D', 'Btrk1dR', 'Btktkmass', 'Bpt', 'Btrk2Pt', 'Bchi2cl'] #pp Bs
+    #variables = ["Bchi2cl", "Bcos_dtheta", "Bdtheta", "Bnorm_svpvDistance_2D",
+    #    "Bpt", "Btktkpt", "Btrk1Pt","Btrk2Pt", "Btrk1dR", "Btrk2dR", "BtrkPtimb"]    
+    #variables = ['Bpt', 'Btrk1dR', 'Bnorm_svpvDistance_2D', 'Bchi2cl', 'Btrk1Pt', 'Bcos_dtheta']
     save_outputs(input_data, checkpoint_path, variables)
     save_outputs(input_mc, checkpoint_path, variables)
 
