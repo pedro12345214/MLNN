@@ -54,11 +54,13 @@ root -l mc_double_gaussian_fit.C
 - Make necessary change to "MLprep.C".
 - Insert your signal region value (upper and lower limits).
 - Please change the Input Tree as accordingly to your root files.
+  
 Please change the Output Tree name as following:
+
 - Tsignal <-> MC Signal
 - Tback <-> Data Bkg Sidebands 
-Also add all the variables you need for the full analysis (not every variable in the root would be analyzed as you can select in the future).
-Please do not include the variable MLscore until you needed it for producing the Data with MLcut.
+- Also add all the variables you need for the full analysis (not every variable in the root would be analyzed as you can select in the future).
+- Please do not include the variable MLscore until you needed it for producing the Data with MLcut.
 
 Depending if you wanted to use all the data points from sidebands or some % of it.
 You could use "MLprep2.C" and calculating the shrinking factor for it (later needed for FOM Optimization, for multiplying the fb factor by inverse of shrinking factor).
@@ -91,12 +93,28 @@ python correlation_MLprep.py
 - Make necessary change (like variables for analysis and SHAP selected variables).
 - Choose a simple Neural Network baseline architecture for first time analysis. I suggest to just use the first one in the code but it's up to your preference.
 - Please change the MC signal and Data sidebands roots directories to the one you are analyzing.
-- Choose a name for the baseline moodel and later a name for Optuna optimized model. 
+- Choose a name for the baseline moodel and later a name for Optuna optimized model.
+- Train with All the variables (Largest set) at this point.
+
+For dataloader, this is a genrally good setup, but could increase the batch size for val_loader and test_loader, as large as RAM enables without crashing.
+Only change train_loader batch size with optuna optimized value.
+
+```bash
+train_loader = DataLoader(train_ds, batch_size=128, shuffle=True,  num_workers=0)
+val_loader   = DataLoader(val_ds,   batch_size=16384, shuffle=False, num_workers=0)
+test_loader  = DataLoader(test_ds,  batch_size=16384, shuffle=False, num_workers=0)
+```
+
+I suggest you to submit job (with more cpu also) as it could take a long time depending the size of root files.
 
 ### 7. Run "cumu_shap_groups.py"
 
+- Based on results from correlation matrix, groups highly correlated variables (set at 80% correlation).
+- Performs cumulative SHAP analysis with representatives of each correlation group.
+- Selects set of feautures responsible for model's 95% of predictions.
+- Run with largest set again at this point.
 
-
+  
 
 
 
